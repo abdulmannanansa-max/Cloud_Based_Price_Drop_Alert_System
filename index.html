@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PriceWatch — AWS Price Drop Alerts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+/* ─── RESET & BASE ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg:        #0A0E1A;
+  --bg2:       #111827;
+  --bg3:       #1A2235;
+  --border:    rgba(255,255,255,0.08);
+  --border2:   rgba(255,255,255,0.14);
+  --text:      #F0F2F7;
+  --text2:     #8A93A8;
+  --text3:     #555F74;
+  --accent:    #6C63FF;
+  --accent2:   #8B85FF;
+  --accentbg:  rgba(108,99,255,0.12);
+  --green:     #22C55E;
+  --greenbg:   rgba(34,197,94,0.1);
+  --amber:     #F59E0B;
+  --amberbg:   rgba(245,158,11,0.1);
+  --red:       #EF4444;
+  --redbg:     rgba(239,68,68,0.1);
+  --radius:    12px;
+  --radius-lg: 18px;
+}
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+h1,h2,h3,h4 { font-family: 'Space Grotesk', sans-serif; line-height: 1.2; }
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+input, select, textarea {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 10px 14px;
+  width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(108,99,255,0.2);
+}
+select option { background: var(--bg2); }
+button { cursor: pointer; font-family: 'Inter', sans-serif; }
+
+/* ─── NAV ─── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 40px; height: 60px;
+  background: rgba(10,14,26,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-logo {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 18px; font-weight: 700;
+  color: var(--text); display: flex; align-items: center; gap: 8px;
+}
+.nav-logo .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); display: inline-block; }
+.nav-links { display: flex; gap: 28px; align-items: center; }
+.nav-links a { color: var(--text2); font-size: 14px; font-weight: 500; transition: color .15s; }
+.nav-links a:hover { color: var(--text); text-decoration: none; }
+.nav-cta {
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 8px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600;
+  transition: background .15s, transform .1s;
+}
+.nav-cta:hover { background: #5952e0; }
+.nav-cta:active { transform: scale(0.97); }
+
+/* ─── SECTIONS ─── */
+section { padding: 80px 40px; max-width: 1100px; margin: 0 auto; }
+.section-label {
+  display: inline-block;
+  font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent2); background: var(--accentbg);
+  padding: 4px 12px; border-radius: 99px; margin-bottom: 16px;
+}
+
+/* ─── HERO ─── */
+.hero {
+  max-width: 100%; padding: 100px 40px 80px;
+  display: flex; align-items: center; gap: 60px;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; top: -200px; left: -200px;
+  width: 700px; height: 700px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(108,99,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.hero-left { flex: 1; min-width: 0; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--accentbg); border: 1px solid rgba(108,99,255,0.3);
+  border-radius: 99px; padding: 5px 14px;
+  font-size: 12px; font-weight: 500; color: var(--accent2);
+  margin-bottom: 24px;
+}
+.hero-eyebrow .live-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  animation: blink 1.8s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+.hero h1 { font-size: clamp(36px, 5vw, 54px); font-weight: 700; line-height: 1.1; margin-bottom: 20px; }
+.hero h1 span { color: var(--accent2); }
+.hero p { font-size: 16px; color: var(--text2); max-width: 480px; margin-bottom: 32px; line-height: 1.7; }
+.hero-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.btn-primary {
+  background: var(--accent); color: #fff;
+  border: none; border-radius: 10px;
+  padding: 12px 24px; font-size: 14px; font-weight: 600;
+  transition: background .15s, transform .1s;
+}
+.btn-primary:hover { background: #5952e0; }
+.btn-primary:active { transform: scale(0.97); }
+.btn-ghost {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border2); border-radius: 10px;
+  padding: 12px 24px; font-size: 14px; font-weight: 500;
+  transition: background .15s;
+}
+.btn-ghost:hover { background: var(--bg3); }
+
+/* Price ticker widget in hero */
+.hero-right { flex: 0 0 340px; }
+.ticker-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.ticker-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ticker-header .title { font-size: 13px; font-weight: 600; }
+.ticker-header .live-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  color: var(--green); background: var(--greenbg);
+  padding: 3px 8px; border-radius: 99px;
+  display: flex; align-items: center; gap: 4px;
+}
+.ticker-item {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 12px;
+}
+.ticker-item:last-child { border-bottom: none; }
+.ticker-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--bg3); display: flex; align-items: center;
+  justify-content: center; font-size: 16px; flex-shrink: 0;
+}
+.ticker-info { flex: 1; min-width: 0; }
+.ticker-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ticker-target { font-size: 11px; color: var(--text3); margin-top: 1px; }
+.ticker-price { text-align: right; flex-shrink: 0; }
+.ticker-price .current { font-size: 14px; font-weight: 600; }
+.ticker-price .change { font-size: 11px; margin-top: 2px; }
+.change.down { color: var(--green); }
+.change.up { color: var(--red); }
+.ticker-price.alert .current { color: var(--green); }
+.ticker-price.watch .current { color: var(--text2); }
+.alert-pill {
+  font-size: 10px; font-weight: 600; letter-spacing: .04em;
+  padding: 2px 7px; border-radius: 99px;
+  background: var(--greenbg); color: var(--green); margin-top: 2px; display: inline-block;
+}
+
+/* ─── STATS BAR ─── */
+.stats-bar {
+  max-width: 100%; padding: 32px 40px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: center; gap: 0;
+}
+.stat-block {
+  flex: 1; max-width: 220px;
+  text-align: center; padding: 0 24px;
+  border-right: 1px solid var(--border);
+}
+.stat-block:last-child { border-right: none; }
+.stat-block .val { font-family: 'Space Grotesk', sans-serif; font-size: 32px; font-weight: 700; color: var(--accent2); }
+.stat-block .lbl { font-size: 12px; color: var(--text3); margin-top: 2px; }
+
+/* ─── HOW IT WORKS ─── */
+.steps-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 40px;
+}
+.step-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px 18px;
+  position: relative; transition: border-color .2s, transform .15s;
+}
+.step-card:hover { border-color: var(--border2); transform: translateY(-2px); }
+.step-num {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  color: var(--accent); background: var(--accentbg);
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 16px;
+}
+.step-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.step-card p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.step-service {
+  display: inline-block; margin-top: 10px;
+  font-size: 10px; font-weight: 600; letter-spacing: .06em;
+  padding: 3px 8px; border-radius: 99px;
+  background: var(--bg3); color: var(--text3); border: 1px solid var(--border);
+}
+/* connector arrows between steps */
+.steps-grid .step-card:not(:last-child)::after {
+  content: '→';
+  position: absolute; right: -13px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text3); font-size: 16px; z-index: 2;
+}
+
+/* ─── MAIN APP (FORM + DASHBOARD) ─── */
+#app { scroll-margin-top: 80px; }
+.app-grid { display: grid; grid-template-columns: 380px 1fr; gap: 24px; margin-top: 40px; }
+
+/* Form card */
+.form-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 28px;
+  position: sticky; top: 80px; align-self: start;
+}
+.form-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+.form-card .subtitle { font-size: 13px; color: var(--text2); margin-bottom: 24px; }
+.form-group { margin-bottom: 16px; }
+.form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.form-submit {
+  width: 100%; padding: 12px; margin-top: 8px;
+  background: var(--accent); color: #fff; border: none; border-radius: 10px;
+  font-size: 14px; font-weight: 600; transition: background .15s, transform .1s;
+}
+.form-submit:hover { background: #5952e0; }
+.form-submit:active { transform: scale(0.98); }
+.form-submit:disabled { opacity: .5; cursor: not-allowed; }
+.toast {
+  margin-top: 12px; padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; line-height: 1.5; display: none;
+}
+.toast.show { display: block; }
+.toast.success { background: var(--greenbg); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+.toast.error   { background: var(--redbg); color: var(--red); border: 1px solid rgba(239,68,68,0.25); }
+.toast.info    { background: var(--accentbg); color: var(--accent2); border: 1px solid rgba(108,99,255,0.25); }
+
+/* Dashboard right side */
+.dash-right {}
+
+/* Alert list */
+.alert-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
+.alert-row {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  display: flex; align-items: center; gap: 14px;
+  transition: border-color .15s;
+}
+.alert-row:hover { border-color: var(--border2); }
+.alert-row .emoji { font-size: 22px; }
+.alert-row .info { flex: 1; min-width: 0; }
+.alert-row .pname { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alert-row .meta { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.alert-row .prices { text-align: right; flex-shrink: 0; }
+.alert-row .cur-price { font-size: 15px; font-weight: 700; }
+.alert-row .tgt-price { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.status-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; padding: 4px 10px; border-radius: 99px;
+}
+.badge-watch { background: var(--accentbg); color: var(--accent2); }
+.badge-alert { background: var(--greenbg); color: var(--green); }
+.badge-high  { background: var(--redbg); color: var(--red); }
+.delete-btn {
+  background: none; border: none; color: var(--text3);
+  font-size: 16px; padding: 4px; border-radius: 6px;
+  transition: color .15s, background .15s;
+}
+.delete-btn:hover { color: var(--red); background: var(--redbg); }
+
+/* Chart section */
+.chart-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 24px;
+}
+.chart-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.chart-top h3 { font-size: 14px; font-weight: 600; }
+.chart-filters { display: flex; gap: 6px; }
+.cf-btn {
+  padding: 5px 12px; font-size: 12px; font-weight: 500;
+  border-radius: 7px; border: 1px solid var(--border2);
+  background: transparent; color: var(--text2); transition: all .15s;
+}
+.cf-btn.active { background: var(--accentbg); color: var(--accent2); border-color: transparent; }
+.cf-btn:hover:not(.active) { background: var(--bg3); color: var(--text); }
+.chart-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-bottom: 18px; }
+.cs-box { background: var(--bg3); border-radius: 10px; padding: 12px 14px; }
+.cs-box .cs-label { font-size: 11px; color: var(--text3); }
+.cs-box .cs-val { font-size: 18px; font-weight: 700; margin-top: 2px; }
+.cs-box .cs-val.green { color: var(--green); }
+.cs-box .cs-val.red { color: var(--red); }
+.cs-box .cs-val.purple { color: var(--accent2); }
+
+/* ─── EMAIL PREVIEW ─── */
+.email-section { margin-top: 80px; }
+.email-preview {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); overflow: hidden; max-width: 560px; margin: 32px auto 0;
+}
+.email-chrome {
+  background: var(--bg3); border-bottom: 1px solid var(--border);
+  padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+}
+.email-chrome .dot-row { display: flex; gap: 5px; }
+.email-chrome .dot-row span { width: 10px; height: 10px; border-radius: 50%; }
+.email-chrome .d-red { background: #FF5F56; }
+.email-chrome .d-yel { background: #FFBD2E; }
+.email-chrome .d-grn { background: #27C93F; }
+.email-chrome .subject-bar { flex: 1; background: var(--bg2); border-radius: 6px; padding: 4px 12px; font-size: 12px; color: var(--text3); }
+.email-body-wrap { padding: 0; }
+.email-top-bar { background: #6C63FF; padding: 20px 28px; }
+.email-top-bar .brand { color: #fff; font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; }
+.email-top-bar .sub { color: rgba(255,255,255,0.7); font-size: 13px; margin-top: 2px; }
+.email-content { padding: 24px 28px; }
+.drop-box { background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: 12px; padding: 16px 18px; margin-bottom: 20px; }
+.drop-box .drop-label { font-size: 11px; font-weight: 600; color: var(--green); text-transform: uppercase; letter-spacing: .08em; }
+.drop-box .price-row { display: flex; align-items: baseline; gap: 12px; margin-top: 6px; }
+.drop-box .old { font-size: 16px; color: var(--text3); text-decoration: line-through; }
+.drop-box .new { font-size: 28px; font-weight: 700; color: var(--green); }
+.drop-box .save-pill { font-size: 12px; font-weight: 600; background: rgba(34,197,94,0.15); color: var(--green); padding: 3px 10px; border-radius: 99px; }
+.email-content p { font-size: 13px; color: var(--text2); margin-bottom: 14px; line-height: 1.7; }
+.email-cta {
+  display: inline-block; background: var(--accent);
+  color: #fff; border-radius: 8px; padding: 10px 22px;
+  font-size: 13px; font-weight: 600;
+}
+.email-footer { padding: 14px 28px; border-top: 1px solid var(--border); font-size: 11px; color: var(--text3); }
+
+/* ─── FEATURES GRID ─── */
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 40px; }
+.feature-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 22px;
+  transition: border-color .2s;
+}
+.feature-card:hover { border-color: var(--border2); }
+.feature-icon {
+  width: 38px; height: 38px; border-radius: 10px;
+  background: var(--accentbg); display: flex; align-items: center;
+  justify-content: center; font-size: 18px; margin-bottom: 14px;
+}
+.feature-card h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+.feature-card p { font-size: 13px; color: var(--text2); line-height: 1.6; }
+
+/* ─── FOOTER ─── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 40px; text-align: center;
+  color: var(--text3); font-size: 13px;
+}
+footer .footer-logo { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 700; color: var(--text2); margin-bottom: 8px; }
+footer .aws-badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+footer .aws-badge {
+  font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  padding: 4px 10px; border-radius: 99px;
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text3);
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 900px) {
+  nav { padding: 0 20px; }
+  .nav-links { display: none; }
+  .hero { flex-direction: column; padding: 60px 20px 40px; gap: 32px; }
+  .hero-right { flex: none; width: 100%; }
+  section { padding: 60px 20px; }
+  .stats-bar { padding: 24px 20px; flex-wrap: wrap; gap: 16px; }
+  .stat-block { border-right: none; }
+  .steps-grid { grid-template-columns: 1fr 1fr; }
+  .step-card::after { display: none; }
+  .app-grid { grid-template-columns: 1fr; }
+  .form-card { position: static; }
+  .features-grid { grid-template-columns: 1fr 1fr; }
+  .chart-stats { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+  .steps-grid { grid-template-columns: 1fr; }
+  .features-grid { grid-template-columns: 1fr; }
+  .stats-bar { flex-direction: column; align-items: center; }
+  .hero h1 { font-size: 30px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo"><span class="dot"></span> PriceWatch</div>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#app">My alerts</a>
+    <a href="#features">Features</a>
+  </div>
+  <button class="nav-cta" onclick="document.getElementById('app').scrollIntoView({behavior:'smooth'})">Set alert →</button>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow"><span class="live-dot"></span> Powered by AWS — Always watching</div>
+    <h1>Never pay full price<br/>for anything <span>online</span>.</h1>
+    <p>Paste a product URL, set your target price, and we'll email you the moment it drops. Built on AWS Lambda, DynamoDB, SNS, and SES.</p>
+    <div class="hero-actions">
+      <button class="btn-primary" onclick="document.getElementById('app').scrollIntoView({behavior:'smooth'})">Track a product →</button>
+      <button class="btn-ghost" onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})">How it works</button>
+    </div>
+  </div>
+  <div class="hero-right">
+    <div class="ticker-card">
+      <div class="ticker-header">
+        <span class="title">Live price tracker</span>
+        <span class="live-badge"><span class="live-dot"></span> Monitoring</span>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-icon">🎧</div>
+        <div class="ticker-info">
+          <div class="ticker-name">Sony WH-1000XM5</div>
+          <div class="ticker-target">Target: ₹20,000</div>
+        </div>
+        <div class="ticker-price alert">
+          <div class="current">₹18,499</div>
+          <div class="change down">↓ 25.9%</div>
+          <div class="alert-pill">✓ Alert sent</div>
+        </div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-icon">📱</div>
+        <div class="ticker-info">
+          <div class="ticker-name">Samsung Galaxy S24 Ultra</div>
+          <div class="ticker-target">Target: ₹65,000</div>
+        </div>
+        <div class="ticker-price watch">
+          <div class="current">₹72,999</div>
+          <div class="change up">↑ 2.1%</div>
+        </div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-icon">💻</div>
+        <div class="ticker-info">
+          <div class="ticker-name">MacBook Air M3</div>
+          <div class="ticker-target">Target: ₹90,000</div>
+        </div>
+        <div class="ticker-price watch">
+          <div class="current">₹99,900</div>
+          <div class="change up">↑ 0.0%</div>
+        </div>
+      </div>
+      <div class="ticker-item">
+        <div class="ticker-icon">🎮</div>
+        <div class="ticker-info">
+          <div class="ticker-name">PlayStation 5 Slim</div>
+          <div class="ticker-target">Target: ₹38,000</div>
+        </div>
+        <div class="ticker-price alert">
+          <div class="current">₹36,990</div>
+          <div class="change down">↓ 7.5%</div>
+          <div class="alert-pill">✓ Alert sent</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-block"><div class="val" id="sc-alerts">0</div><div class="lbl">Alerts tracked</div></div>
+  <div class="stat-block"><div class="val" id="sc-sent">0</div><div class="lbl">Emails sent</div></div>
+  <div class="stat-block"><div class="val" id="sc-saved">₹0</div><div class="lbl">Avg. savings / alert</div></div>
+  <div class="stat-block"><div class="val">6h</div><div class="lbl">Check frequency</div></div>
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="section-label">How it works</div>
+  <h2 style="font-size:32px; font-weight:700; margin-bottom:8px;">Four steps, fully automated</h2>
+  <p style="color:var(--text2); max-width:520px;">Your alert request flows through an AWS serverless pipeline and fires an email the moment the price drops below your target.</p>
+  <div class="steps-grid">
+    <div class="step-card">
+      <div class="step-num">1</div>
+      <h3>Paste your URL</h3>
+      <p>Submit any Amazon product link and your target price via the form below.</p>
+      <span class="step-service">API Gateway</span>
+    </div>
+    <div class="step-card">
+      <div class="step-num">2</div>
+      <h3>Saved to database</h3>
+      <p>A Lambda function validates and stores your alert in DynamoDB instantly.</p>
+      <span class="step-service">Lambda + DynamoDB</span>
+    </div>
+    <div class="step-card">
+      <div class="step-num">3</div>
+      <h3>Price checked every 6h</h3>
+      <p>EventBridge triggers another Lambda on a cron schedule to fetch current prices.</p>
+      <span class="step-service">EventBridge</span>
+    </div>
+    <div class="step-card">
+      <div class="step-num">4</div>
+      <h3>Email alert sent</h3>
+      <p>If the price drops below your target, SNS publishes and SES delivers your alert.</p>
+      <span class="step-service">SNS + SES</span>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN APP -->
+<section id="app">
+  <div class="section-label">Your alerts</div>
+  <h2 style="font-size:32px; font-weight:700; margin-bottom:8px;">Track a product</h2>
+  <p style="color:var(--text2);">We'll monitor it every 6 hours and email you when the price drops.</p>
+  <div class="app-grid">
+    <!-- Form -->
+    <div class="form-card">
+      <h3>New price alert</h3>
+      <div class="subtitle">Paste any Amazon.in product URL</div>
+
+      <div class="form-group">
+        <label>Product URL</label>
+        <input type="url" id="f-url" placeholder="https://amazon.in/dp/XXXXXX"/>
+      </div>
+      <div class="form-group">
+        <label>Product name (for your reference)</label>
+        <input type="text" id="f-name" placeholder="e.g. Sony WH-1000XM5"/>
+      </div>
+      <div class="form-group">
+        <label>Your email address</label>
+        <input type="email" id="f-email" placeholder="you@example.com"/>
+      </div>
+      <div class="form-group input-row">
+        <div>
+          <label>Current price (₹)</label>
+          <input type="number" id="f-cur" placeholder="24990"/>
+        </div>
+        <div>
+          <label>Alert me below (₹)</label>
+          <input type="number" id="f-target" placeholder="20000"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Product emoji (optional)</label>
+        <input type="text" id="f-emoji" placeholder="🎧" maxlength="2"/>
+      </div>
+      <button class="form-submit" id="submit-btn" onclick="addAlert()">Set price alert</button>
+      <div class="toast" id="form-toast"></div>
+
+      <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); font-size:12px; color:var(--text3); line-height:1.8;">
+        <strong style="color:var(--text2); display:block; margin-bottom:4px;">🔌 AWS API endpoint</strong>
+        Replace with your deployed API Gateway URL:
+        <code style="display:block; background:var(--bg3); border-radius:6px; padding:8px 10px; margin-top:6px; font-size:11px; color:var(--accent2); word-break:break-all;">
+          POST https://&lt;api-id&gt;.execute-api.ap-south-1.amazonaws.com/prod/alerts
+        </code>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dash-right">
+      <!-- Alert list -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <h3 style="font-size:14px; font-weight:600;">Active alerts</h3>
+        <span id="alert-count" style="font-size:12px; color:var(--text3);">0 tracked</span>
+      </div>
+      <div class="alert-list" id="alert-list">
+        <!-- populated by JS -->
+      </div>
+      <div id="empty-state" style="background:var(--bg2); border:1px dashed var(--border2); border-radius:12px; padding:32px; text-align:center; color:var(--text3);">
+        <div style="font-size:32px; margin-bottom:8px;">📭</div>
+        <div style="font-size:13px;">No alerts yet. Add one using the form.</div>
+      </div>
+
+      <!-- Chart -->
+      <div class="chart-card" id="chart-card" style="display:none; margin-top:20px;">
+        <div class="chart-top">
+          <h3 id="chart-title">Price history</h3>
+          <div class="chart-filters">
+            <button class="cf-btn active" onclick="selectProduct(0,this)">Product 1</button>
+            <button class="cf-btn" id="cf2" onclick="selectProduct(1,this)" style="display:none">Product 2</button>
+            <button class="cf-btn" id="cf3" onclick="selectProduct(2,this)" style="display:none">Product 3</button>
+          </div>
+        </div>
+        <div class="chart-stats">
+          <div class="cs-box"><div class="cs-label">Current price</div><div class="cs-val purple" id="cs-cur">—</div></div>
+          <div class="cs-box"><div class="cs-label">All-time low</div><div class="cs-val green" id="cs-low">—</div></div>
+          <div class="cs-box"><div class="cs-label">Your target</div><div class="cs-val" id="cs-tgt">—</div></div>
+        </div>
+        <div style="position:relative; height:220px;">
+          <canvas id="price-chart" role="img" aria-label="Price history chart"></canvas>
+        </div>
+        <div style="margin-top:12px; font-size:11px; color:var(--text3); display:flex; gap:16px; flex-wrap:wrap;">
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:2px;background:#6C63FF;display:inline-block;border-radius:2px;"></span> Price</span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:10px;height:2px;background:transparent;border-top:2px dashed #22C55E;display:inline-block;"></span> Your target</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- EMAIL PREVIEW -->
+<section class="email-section">
+  <div style="text-align:center;">
+    <div class="section-label">Email alerts</div>
+    <h2 style="font-size:32px; font-weight:700; margin-bottom:8px;">What you'll receive</h2>
+    <p style="color:var(--text2); max-width:420px; margin:0 auto;">Sent instantly via Amazon SES when your target price is hit.</p>
+  </div>
+  <div class="email-preview">
+    <div class="email-chrome">
+      <div class="dot-row"><span class="d-red"></span><span class="d-yel"></span><span class="d-grn"></span></div>
+      <div class="subject-bar">🔔 Price Drop Alert — Sony WH-1000XM5 Headphones</div>
+    </div>
+    <div class="email-body-wrap">
+      <div class="email-top-bar">
+        <div class="brand">⚡ PriceWatch</div>
+        <div class="sub">Your price alert fired</div>
+      </div>
+      <div class="email-content">
+        <div class="drop-box">
+          <div class="drop-label">Price dropped below your target!</div>
+          <div class="price-row">
+            <span class="old">₹24,990</span>
+            <span class="new">₹18,499</span>
+            <span class="save-pill">Save ₹6,491 (25%)</span>
+          </div>
+        </div>
+        <p>Great news! <strong style="color:var(--text);">Sony WH-1000XM5 Headphones</strong> just dropped to <strong style="color:var(--green);">₹18,499</strong> — below your alert target of ₹20,000.</p>
+        <p style="font-size:12px; color:var(--text3);">Checked at: 14 Jun 2024, 12:00 UTC · via EventBridge + Lambda</p>
+        <a href="#" class="email-cta">View on Amazon →</a>
+      </div>
+      <div class="email-footer">
+        Sent by PriceWatch · Powered by AWS SNS + SES · <a href="#" style="color:var(--text3);">Unsubscribe</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label">Built on AWS</div>
+  <h2 style="font-size:32px; font-weight:700; margin-bottom:8px;">Serverless by design</h2>
+  <p style="color:var(--text2);">Zero servers to manage. Pay only for what you use. Infinitely scalable.</p>
+  <div class="features-grid">
+    <div class="feature-card"><div class="feature-icon">⚡</div><h3>API Gateway</h3><p>REST endpoint that receives alert submissions, validates auth via API key, and routes to Lambda.</p></div>
+    <div class="feature-card"><div class="feature-icon">λ</div><h3>AWS Lambda</h3><p>Two functions: SaveAlert (on submit) and CheckPrice (on cron). Python 3.12, cold start under 200ms.</p></div>
+    <div class="feature-card"><div class="feature-icon">🗄️</div><h3>DynamoDB</h3><p>Stores alerts and price history with TTL-based expiry. Single-table design with composite keys.</p></div>
+    <div class="feature-card"><div class="feature-icon">⏰</div><h3>EventBridge</h3><p>Cron rule <code style="font-size:11px;color:var(--accent2);">cron(0 */6 * * ? *)</code> fires price checks every 6 hours automatically.</p></div>
+    <div class="feature-card"><div class="feature-icon">📣</div><h3>SNS</h3><p>Publishes alert messages when a price drop is detected. Fanout to multiple subscribers.</p></div>
+    <div class="feature-card"><div class="feature-icon">📧</div><h3>Amazon SES</h3><p>Sends formatted HTML email alerts to users. Domain verified, SPF/DKIM configured.</p></div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">⚡ PriceWatch</div>
+  <div>A serverless price monitoring system built on AWS</div>
+  <div class="aws-badges">
+    <span class="aws-badge">Lambda</span>
+    <span class="aws-badge">DynamoDB</span>
+    <span class="aws-badge">API Gateway</span>
+    <span class="aws-badge">EventBridge</span>
+    <span class="aws-badge">SNS</span>
+    <span class="aws-badge">SES</span>
+  </div>
+</footer>
+
+<script>
+// ─── CONFIG ─── Replace with your deployed API Gateway URL
+const API_URL = 'https://YOUR_API_ID.execute-api.ap-south-1.amazonaws.com/prod/alerts';
+const API_KEY = 'YOUR_API_KEY_HERE';
+
+// ─── STATE ───
+let alerts = JSON.parse(localStorage.getItem('pw_alerts') || '[]');
+let chartInst = null;
+let currentChartIdx = 0;
+
+const MOCK_HISTORY = [
+  [29990, 27500, 24990, 22500, 20999, 18499],
+  [84999, 80000, 76500, 74000, 73500, 72999],
+  [99900, 99900, 97500, 99900, 99900, 99900]
+];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun'];
+
+function saveAlerts() { localStorage.setItem('pw_alerts', JSON.stringify(alerts)); }
+
+function fmt(n) { return '₹' + Number(n).toLocaleString('en-IN'); }
+
+function showToast(msg, type) {
+  const t = document.getElementById('form-toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 4000);
+}
+
+// ─── COUNTER ANIMATION ───
+function animateCounter(el, end, prefix='', suffix='') {
+  let start = 0;
+  const dur = 1200;
+  const step = end / (dur / 16);
+  const timer = setInterval(() => {
+    start = Math.min(start + step, end);
+    el.textContent = prefix + Math.round(start).toLocaleString('en-IN') + suffix;
+    if (start >= end) clearInterval(timer);
+  }, 16);
+}
+
+window.addEventListener('load', () => {
+  animateCounter(document.getElementById('sc-alerts'), 1847);
+  animateCounter(document.getElementById('sc-sent'), 3291);
+  document.getElementById('sc-saved').textContent = '₹0';
+  setTimeout(() => {
+    let s = 0; const el = document.getElementById('sc-saved');
+    const t = setInterval(() => { s = Math.min(s+150, 4800); el.textContent = '₹'+s.toLocaleString('en-IN'); if(s>=4800) clearInterval(t); }, 16);
+  }, 200);
+  renderAlerts();
+});
+
+// ─── ADD ALERT ───
+async function addAlert() {
+  const url    = document.getElementById('f-url').value.trim();
+  const name   = document.getElementById('f-name').value.trim();
+  const email  = document.getElementById('f-email').value.trim();
+  const cur    = parseInt(document.getElementById('f-cur').value);
+  const target = parseInt(document.getElementById('f-target').value);
+  const emoji  = document.getElementById('f-emoji').value.trim() || '🛒';
+
+  if (!url || !name || !email || !cur || !target) { showToast('Please fill in all fields.', 'error'); return; }
+  if (target >= cur) { showToast('Target price should be less than the current price.', 'error'); return; }
+  if (!email.includes('@')) { showToast('Please enter a valid email address.', 'error'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Setting alert...';
+  showToast('Sending to AWS API Gateway...', 'info');
+
+  // ── Call real AWS API (uncomment when deployed) ──
+  // try {
+  //   const res = await fetch(API_URL, {
+  //     method: 'POST',
+  //     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
+  //     body: JSON.stringify({ productUrl: url, productName: name, userEmail: email, currentPrice: cur, targetPrice: target })
+  //   });
+  //   if (!res.ok) throw new Error('API error ' + res.status);
+  // } catch(e) { showToast('API error: ' + e.message, 'error'); btn.disabled=false; btn.textContent='Set price alert'; return; }
+
+  // Simulated delay for demo
+  await new Promise(r => setTimeout(r, 1200));
+
+  const alert = { id: Date.now(), url, name, email, cur, target, emoji, status: target < cur ? 'watch' : 'high', createdAt: new Date().toISOString(), history: MOCK_HISTORY[alerts.length % 3] };
+  alerts.unshift(alert);
+  saveAlerts();
+  renderAlerts();
+  showToast(`✓ Alert set! We'll email ${email} when ${name} drops below ${fmt(target)}.`, 'success');
+
+  ['f-url','f-name','f-cur','f-target','f-emoji'].forEach(id => document.getElementById(id).value = '');
+  btn.disabled = false;
+  btn.textContent = 'Set price alert';
+}
+
+// ─── RENDER ALERTS ───
+function renderAlerts() {
+  const list = document.getElementById('alert-list');
+  const empty = document.getElementById('empty-state');
+  const chartCard = document.getElementById('chart-card');
+  document.getElementById('alert-count').textContent = alerts.length + ' tracked';
+
+  if (alerts.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    chartCard.style.display = 'none';
+    return;
+  }
+  empty.style.display = 'none';
+  chartCard.style.display = 'block';
+
+  list.innerHTML = alerts.map((a, i) => {
+    const dropped = a.cur > a.target;
+    const status = dropped ? 'badge-alert' : 'badge-watch';
+    const statusLabel = dropped ? '✓ Alert sent' : 'Monitoring';
+    return `<div class="alert-row">
+      <div class="emoji">${a.emoji}</div>
+      <div class="info">
+        <div class="pname">${a.name}</div>
+        <div class="meta">${a.email} · Set ${new Date(a.createdAt).toLocaleDateString('en-IN')}</div>
+      </div>
+      <div class="prices">
+        <div class="cur-price" style="color:${dropped ? 'var(--green)' : 'var(--text)'}">${fmt(a.cur)}</div>
+        <div class="tgt-price">Target: ${fmt(a.target)}</div>
+      </div>
+      <span class="status-badge ${status}">${statusLabel}</span>
+      <button class="delete-btn" onclick="deleteAlert(${i})" title="Remove alert">✕</button>
+    </div>`;
+  }).join('');
+
+  // Update chart filter buttons
+  const names = alerts.slice(0, 3).map(a => a.name.split(' ').slice(0, 2).join(' '));
+  const btns = document.querySelectorAll('.cf-btn');
+  btns.forEach((btn, i) => {
+    if (alerts[i]) { btn.style.display = 'inline-block'; btn.textContent = names[i]; }
+    else { btn.style.display = 'none'; }
+  });
+
+  buildChart(Math.min(currentChartIdx, alerts.length - 1));
+}
+
+function deleteAlert(i) {
+  alerts.splice(i, 1);
+  saveAlerts();
+  currentChartIdx = 0;
+  renderAlerts();
+}
+
+// ─── CHART ───
+function selectProduct(idx, btn) {
+  document.querySelectorAll('.cf-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentChartIdx = idx;
+  buildChart(idx);
+}
+
+function buildChart(idx) {
+  const a = alerts[idx];
+  if (!a) return;
+  document.getElementById('chart-title').textContent = a.name;
+  document.getElementById('cs-cur').textContent = fmt(a.cur);
+  document.getElementById('cs-low').textContent = fmt(Math.min(...a.history));
+  document.getElementById('cs-tgt').textContent = fmt(a.target);
+
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+
+  chartInst = new Chart(document.getElementById('price-chart'), {
+    type: 'line',
+    data: {
+      labels: MONTHS,
+      datasets: [
+        {
+          label: 'Price',
+          data: a.history,
+          borderColor: '#6C63FF',
+          backgroundColor: 'rgba(108,99,255,0.08)',
+          borderWidth: 2,
+          pointBackgroundColor: '#6C63FF',
+          pointRadius: 4,
+          tension: 0.4,
+          fill: true
+        },
+        {
+          label: 'Target',
+          data: Array(MONTHS.length).fill(a.target),
+          borderColor: '#22C55E',
+          borderWidth: 1.5,
+          borderDash: [5,4],
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ' + fmt(ctx.raw) } }
+      },
+      scales: {
+        y: {
+          ticks: { callback: v => '₹'+(v/1000).toFixed(0)+'k', font:{size:11}, color:'#555F74' },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        },
+        x: { ticks: { font:{size:11}, color:'#555F74' }, grid: { display: false } }
+      }
+    }
+  });
+}
+
+// Add demo alerts on first load
+if (alerts.length === 0) {
+  const demos = [
+    { id:1, url:'https://amazon.in/dp/B0CHHFDTF3', name:'Sony WH-1000XM5 Headphones', email:'rahul@example.com', cur:18499, target:20000, emoji:'🎧', status:'alert', createdAt:'2024-06-01T10:00:00Z', history:MOCK_HISTORY[0] },
+    { id:2, url:'https://amazon.in/dp/B0CLP9TG16', name:'Samsung Galaxy S24 Ultra', email:'priya@example.com', cur:72999, target:65000, emoji:'📱', status:'watch', createdAt:'2024-06-05T12:00:00Z', history:MOCK_HISTORY[1] }
+  ];
+  demos.forEach(d => alerts.push(d));
+  saveAlerts();
+}
+renderAlerts();
+</script>
+</body>
+</html>
