@@ -698,8 +698,10 @@ footer .aws-badge {
 
 <script>
 // ─── CONFIG ─── Replace with your deployed API Gateway URL
-const API_URL = 'https://YOUR_API_ID.execute-api.ap-south-1.amazonaws.com/prod/alerts';
-const API_KEY = 'YOUR_API_KEY_HERE';
+// —— CONFIG —— Replace with your deployed API Gateway URL
+const API_URL     = 'https://auvojxjkq8.execute-api.us-east-1.amazonaws.com/prod/alerts';
+const API_KEY     = '';
+const TRIGGER_URL = 'https://auvojxjkq8.execute-api.us-east-1.amazonaws.com/prod/trigger';
 
 // ─── STATE ───
 let alerts = JSON.parse(localStorage.getItem('pw_alerts') || '[]');
