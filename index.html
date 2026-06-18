@@ -698,8 +698,10 @@ footer .aws-badge {
 
 <script>
 // ─── CONFIG ─── Replace with your deployed API Gateway URL
-const API_URL = 'https://YOUR_API_ID.execute-api.ap-south-1.amazonaws.com/prod/alerts';
-const API_KEY = 'YOUR_API_KEY_HERE';
+
+const API_URL     = 'https://auvojxjkq8.execute-api.us-east-1.amazonaws.com/prod/alerts';
+const API_KEY     = '';
+const TRIGGER_URL = 'https://auvojxjkq8.execute-api.us-east-1.amazonaws.com/prod/trigger';
 
 // ─── STATE ───
 let alerts = JSON.parse(localStorage.getItem('pw_alerts') || '[]');
@@ -757,7 +759,7 @@ async function addAlert() {
   const emoji  = document.getElementById('f-emoji').value.trim() || '🛒';
 
   if (!url || !name || !email || !cur || !target) { showToast('Please fill in all fields.', 'error'); return; }
-  if (target >= cur) { showToast('Target price should be less than the current price.', 'error'); return; }
+  if (target >= cur) { showToast('Target price should be less than current price.', 'error'); return; }
   if (!email.includes('@')) { showToast('Please enter a valid email address.', 'error'); return; }
 
   const btn = document.getElementById('submit-btn');
@@ -765,26 +767,45 @@ async function addAlert() {
   btn.textContent = 'Setting alert...';
   showToast('Sending to AWS API Gateway...', 'info');
 
-  // ── Call real AWS API (uncomment when deployed) ──
-  // try {
-  //   const res = await fetch(API_URL, {
-  //     method: 'POST',
-  //     headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-  //     body: JSON.stringify({ productUrl: url, productName: name, userEmail: email, currentPrice: cur, targetPrice: target })
-  //   });
-  //   if (!res.ok) throw new Error('API error ' + res.status);
-  // } catch(e) { showToast('API error: ' + e.message, 'error'); btn.disabled=false; btn.textContent='Set price alert'; return; }
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: url,
+        productUrl: url,
+        productName: name,
+        email: email,
+        userEmail: email,
+        currentPrice: cur,
+        targetPrice: target,
+        emoji: emoji
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showToast('API error: ' + (data.error || res.status), 'error');
+      btn.disabled = false;
+      btn.textContent = 'Set price alert';
+      return;
+    }
+    const alertId = data.alertId || Date.now();
+    const newAlert = {
+      id: alertId,
+      url, name, email, cur, target, emoji,
+      status: 'watch',
+      createdAt: new Date().toISOString(),
+      history: [cur]
+    };
+    alerts.unshift(newAlert);
+    saveAlerts();
+    renderAlerts();
+    showToast(`✓ Alert saved to AWS! We'll email ${email} when ${name} drops below ₹${target.toLocaleString('en-IN')}.`, 'success');
+    ['f-url','f-name','f-cur','f-target','f-emoji'].forEach(id => document.getElementById(id).value = '');
+  } catch(e) {
+    showToast('Network error: ' + e.message, 'error');
+  }
 
-  // Simulated delay for demo
-  await new Promise(r => setTimeout(r, 1200));
-
-  const alert = { id: Date.now(), url, name, email, cur, target, emoji, status: target < cur ? 'watch' : 'high', createdAt: new Date().toISOString(), history: MOCK_HISTORY[alerts.length % 3] };
-  alerts.unshift(alert);
-  saveAlerts();
-  renderAlerts();
-  showToast(`✓ Alert set! We'll email ${email} when ${name} drops below ${fmt(target)}.`, 'success');
-
-  ['f-url','f-name','f-cur','f-target','f-emoji'].forEach(id => document.getElementById(id).value = '');
   btn.disabled = false;
   btn.textContent = 'Set price alert';
 }
@@ -820,7 +841,11 @@ function renderAlerts() {
         <div class="tgt-price">Target: ${fmt(a.target)}</div>
       </div>
       <span class="status-badge ${status}">${statusLabel}</span>
-      <button class="delete-btn" onclick="deleteAlert(${i})" title="Remove alert">✕</button>
+      <button onclick="simulateDrop('${a.id}','${a.name}','${a.email}',${a.cur},${a.target},'${a.url}','${a.emoji}')" 
+  style="background:var(--accentbg);border:1px solid var(--accent);color:var(--accent2);border-radius:8px;padding:5px 10px;font-size:11px;font-weight:600;margin-right:6px;">
+  ⚡ Simulate
+</button>
+<button class="delete-btn" onclick="deleteAlert(${i})" title="Remove alert">✕</button>
     </div>`;
   }).join('');
 
@@ -914,6 +939,24 @@ if (alerts.length === 0) {
   saveAlerts();
 }
 renderAlerts();
+async function simulateDrop(alertId, productName, email, currentPrice, targetPrice, url, emoji) {
+  showToast('⚡ Triggering price drop simulation...', 'info');
+  try {
+    const res = await fetch(TRIGGER_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ alertId, simulatedPrice: targetPrice - 100 })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast('✅ Email sent! Check ' + email + ' inbox (also check spam).', 'success');
+    } else {
+      showToast('Error: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    showToast('Network error: ' + e.message, 'error');
+  }
+}
 </script>
 </body>
 </html>

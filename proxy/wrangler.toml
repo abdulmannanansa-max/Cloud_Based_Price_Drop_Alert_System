@@ -1,0 +1,17 @@
+name               = "pricewatch-proxy"
+main               = "index.js"
+compatibility_date = "2024-06-01"
+
+[vars]
+# Non-secret config — update ALLOWED_ORIGIN after you know your hosting URL.
+# e.g. "https://pricewatch.netlify.app" or "https://yourname.github.io"
+ALLOWED_ORIGIN = "https://abdulmannanansa-max.github.io/Cloud_Based_Price_Drop_Alert_System/"
+
+# ── Secrets (never put real values here) ──────────────────────────
+# Set these via the CLI BEFORE deploying:
+#
+#   wrangler secret put API_KEY
+#   wrangler secret put API_GATEWAY_URL
+#
+# Cloudflare encrypts them at rest; they are invisible to anyone
+# including you after the first put.
